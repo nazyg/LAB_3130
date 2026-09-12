@@ -7,6 +7,7 @@ pixel RPG characters created by Sean Browning.
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using System.IO;
 
 
 #region Assignment Instructions
@@ -75,22 +76,63 @@ static public class AssignmentPart1
 
     static public void SavePartyButtonPressed()
     {
-        foreach (PartyCharacter pc in GameContent.partyCharacters)
+        /* foreach (PartyCharacter pc in GameContent.partyCharacters)
+         {
+             Debug.Log("PC class id == " + pc.classID);
+         }*/
+        using (StreamWriter sw = new StreamWriter("party.txt"))
         {
-            Debug.Log("PC class id == " + pc.classID);
+            foreach (PartyCharacter pc in GameContent.partyCharacters)
+            {
+                sw.WriteLine(pc.classID);
+                sw.WriteLine(pc.health);
+                sw.WriteLine(pc.mana);
+                sw.WriteLine(pc.strength);
+                sw.WriteLine(pc.agility);
+                sw.WriteLine(pc.wisdom);
+
+                sw.WriteLine(pc.equipment.Count);
+                foreach (int equipID in pc.equipment)
+                {
+                    sw.WriteLine(equipID);
+                }
+            }
         }
     }
 
     static public void LoadPartyButtonPressed()
     {
         GameContent.partyCharacters.Clear();
-
+        /*
         PartyCharacter pc = new PartyCharacter(1, 10, 10, 10, 10, 10);
         GameContent.partyCharacters.AddLast(pc);
         pc = new PartyCharacter(2, 11, 11, 11, 11, 11);
         GameContent.partyCharacters.AddLast(pc);
         pc = new PartyCharacter(3, 12, 12, 12, 12, 12);
         GameContent.partyCharacters.AddLast(pc);
+        */
+        using (StreamReader sr = new StreamReader("party.txt"))
+        {
+            while (sr.Peek() != -1)
+            {
+                PartyCharacter pc = new PartyCharacter();
+
+                pc.classID = int.Parse(sr.ReadLine());
+                pc.health = int.Parse(sr.ReadLine());
+                pc.mana = int.Parse(sr.ReadLine());
+                pc.strength = int.Parse(sr.ReadLine());
+                pc.agility = int.Parse(sr.ReadLine());
+                pc.wisdom = int.Parse(sr.ReadLine());
+
+                int equipmentCount = int.Parse(sr.ReadLine());
+                for (int i = 0; i < equipmentCount; i++)
+                {
+                    pc.equipment.AddLast(int.Parse(sr.ReadLine()));
+                }
+
+                GameContent.partyCharacters.AddLast(pc);
+            }
+        }
 
         GameContent.RefreshUI();
     }
