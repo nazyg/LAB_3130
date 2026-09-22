@@ -151,7 +151,7 @@ static public class AssignmentPart1
 //  This will enable the needed UI/function calls for your to proceed with your assignment.
 static public class AssignmentConfiguration
 {
-    public const int PartOfAssignmentThatIsInDevelopment = 1;
+    public const int PartOfAssignmentThatIsInDevelopment = 2;
 }
 
 /*
@@ -191,17 +191,27 @@ static public class AssignmentPart2
 {
 
     static List<string> listOfPartyNames;
+    static string currentPartyName;
+    const string SaveFolder = "SavedParties/";
 
     static public void GameStart()
     {
         listOfPartyNames = new List<string>();
-        listOfPartyNames.Add("sample 1");
-        listOfPartyNames.Add("sample 2");
-        listOfPartyNames.Add("sample 3");
 
+        if (!Directory.Exists(SaveFolder))
+            Directory.CreateDirectory(SaveFolder);
+
+        RefreshPartyNameList();
         GameContent.RefreshUI();
     }
-
+    static void RefreshPartyNameList()
+    {
+        listOfPartyNames.Clear();
+        foreach (string filePath in Directory.GetFiles(SaveFolder, "*.txt"))
+        {
+            listOfPartyNames.Add(Path.GetFileNameWithoutExtension(filePath));
+        }
+    }
     static public List<string> GetListOfPartyNames()
     {
         return listOfPartyNames;
@@ -209,17 +219,82 @@ static public class AssignmentPart2
 
     static public void LoadPartyDropDownChanged(string selectedName)
     {
+        LoadParty(selectedName);
+        currentPartyName = selectedName;
         GameContent.RefreshUI();
     }
 
     static public void SavePartyButtonPressed()
     {
+        string name = GameContent.GetPartyNameFromInput();
+        SaveParty(name);
+        currentPartyName = name;
+
+        RefreshPartyNameList();
         GameContent.RefreshUI();
     }
 
     static public void DeletePartyButtonPressed()
     {
+        if (currentPartyName != null)
+        {
+            string path = SaveFolder + currentPartyName + ".txt";
+            if (File.Exists(path))
+                File.Delete(path);
+
+            currentPartyName = null;
+            GameContent.partyCharacters.Clear();
+            RefreshPartyNameList();
+        }
+
         GameContent.RefreshUI();
+    }
+    static void SaveParty(string name)
+    {
+        using (StreamWriter sw = new StreamWriter(SaveFolder + name + ".txt"))
+        {
+            foreach (PartyCharacter pc in GameContent.partyCharacters)
+            {
+                sw.WriteLine(pc.classID);
+                sw.WriteLine(pc.health);
+                sw.WriteLine(pc.mana);
+                sw.WriteLine(pc.strength);
+                sw.WriteLine(pc.agility);
+                sw.WriteLine(pc.wisdom);
+
+                sw.WriteLine(pc.equipment.Count);
+                foreach (int equipID in pc.equipment)
+                    sw.WriteLine(equipID);
+            }
+        }
+    }
+    static void LoadParty(string name)
+    {
+        GameContent.partyCharacters.Clear();
+
+        string path = SaveFolder + name + ".txt";
+        if (!File.Exists(path)) return;
+
+        using (StreamReader sr = new StreamReader(path))
+        {
+            while (sr.Peek() != -1)
+            {
+                PartyCharacter pc = new PartyCharacter();
+
+                pc.classID = int.Parse(sr.ReadLine());
+                pc.health = int.Parse(sr.ReadLine());
+                pc.mana = int.Parse(sr.ReadLine());
+                pc.strength = int.Parse(sr.ReadLine());
+                pc.agility = int.Parse(sr.ReadLine());
+                pc.wisdom = int.Parse(sr.ReadLine());
+
+                int equipmentCount = int.Parse(sr.ReadLine());
+                for (int i = 0; i < equipmentCount; i++)
+                    pc.equipment.AddLast(int.Parse(sr.ReadLine()));
+
+                GameContent.partyCharacters.AddLast(pc);
+            }
+        }
     }
 
 }
