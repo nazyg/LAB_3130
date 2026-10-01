@@ -1,6 +1,6 @@
 
 /*
-This RPG data streaming assignment was created by Fernando Restituto with 
+This RPG data streaming assignment was created by Fernando Restituto with
 pixel RPG characters created by Sean Browning.
 */
 
@@ -8,6 +8,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System.IO;
+using System.Text;
 
 
 #region Assignment Instructions
@@ -16,11 +17,11 @@ using System.IO;
 
 Wax on, wax off.
 
-    The development of saving and loading systems shares much in common with that of networked gameplay development.  
-    Both involve developing around data which is packaged and passed into (or gotten from) a stream.  
+    The development of saving and loading systems shares much in common with that of networked gameplay development.
+    Both involve developing around data which is packaged and passed into (or gotten from) a stream.
     Thus, prior to attacking the problems of development for networked games, you will strengthen your abilities to develop solutions using the easier to work with HD saving/loading frameworks.
 
-    Try to understand not just the framework tools, but also, 
+    Try to understand not just the framework tools, but also,
     seek to familiarize yourself with how we are able to break data down, pass it into a stream and then rebuild it from another stream.
 
 
@@ -69,70 +70,134 @@ public partial class PartyCharacter
 #endregion
 
 
+#region Serialization (party <-> text)
+
+/*
+    Turns a party into text and back again.
+    Knows nothing about files or the hard drive.
+
+    Text layout, one value per line, repeated for each character:
+        classID
+        health
+        mana
+        strength
+        agility
+        wisdom
+        equipmentCount
+        equipmentID   (repeated equipmentCount times)
+*/
+static public class PartySerializer
+{
+    static public string SerializeParty(LinkedList<PartyCharacter> party)
+    {
+        StringBuilder serializedParty = new StringBuilder();
+
+        foreach (PartyCharacter character in party)
+            AppendCharacter(serializedParty, character);
+
+        return serializedParty.ToString();
+    }
+
+    static public LinkedList<PartyCharacter> DeserializeParty(string serializedParty)
+    {
+        LinkedList<PartyCharacter> party = new LinkedList<PartyCharacter>();
+
+        using (StringReader lineReader = new StringReader(serializedParty))
+        {
+            while (lineReader.Peek() != -1)
+                party.AddLast(ReadCharacter(lineReader));
+        }
+
+        return party;
+    }
+
+    static void AppendCharacter(StringBuilder serializedParty, PartyCharacter character)
+    {
+        serializedParty.AppendLine(character.classID.ToString());
+        serializedParty.AppendLine(character.health.ToString());
+        serializedParty.AppendLine(character.mana.ToString());
+        serializedParty.AppendLine(character.strength.ToString());
+        serializedParty.AppendLine(character.agility.ToString());
+        serializedParty.AppendLine(character.wisdom.ToString());
+
+        serializedParty.AppendLine(character.equipment.Count.ToString());
+        foreach (int equipmentID in character.equipment)
+            serializedParty.AppendLine(equipmentID.ToString());
+    }
+
+    static PartyCharacter ReadCharacter(StringReader lineReader)
+    {
+        PartyCharacter character = new PartyCharacter();
+
+        character.classID = ReadInt(lineReader);
+        character.health = ReadInt(lineReader);
+        character.mana = ReadInt(lineReader);
+        character.strength = ReadInt(lineReader);
+        character.agility = ReadInt(lineReader);
+        character.wisdom = ReadInt(lineReader);
+
+        int equipmentCount = ReadInt(lineReader);
+        for (int equipmentIndex = 0; equipmentIndex < equipmentCount; equipmentIndex++)
+            character.equipment.AddLast(ReadInt(lineReader));
+
+        return character;
+    }
+
+    static int ReadInt(StringReader lineReader)
+    {
+        return int.Parse(lineReader.ReadLine());
+    }
+}
+
+#endregion
+
+
+#region Hard drive storage (text <-> file)
+/*
+    Reads and writes text on the hard drive.
+    Knows nothing about parties or characters.
+*/
+static public class TextFileStorage
+{
+    static public void WriteTextToFile(string filePath, string text)
+    {
+        using (StreamWriter fileWriter = new StreamWriter(filePath))
+        {
+            fileWriter.Write(text);
+        }
+    }
+
+    static public string ReadTextFromFile(string filePath)
+    {
+        using (StreamReader fileReader = new StreamReader(filePath))
+        {
+            return fileReader.ReadToEnd();
+        }
+    }
+}
+
+#endregion
+
+
 #region Assignment Part 1
 
 static public class AssignmentPart1
 {
+    const string PartyFilePath = "party.txt";
 
     static public void SavePartyButtonPressed()
     {
-        /* foreach (PartyCharacter pc in GameContent.partyCharacters)
-         {
-             Debug.Log("PC class id == " + pc.classID);
-         }*/
-        using (StreamWriter sw = new StreamWriter("party.txt"))
-        {
-            foreach (PartyCharacter pc in GameContent.partyCharacters)
-            {
-                sw.WriteLine(pc.classID);
-                sw.WriteLine(pc.health);
-                sw.WriteLine(pc.mana);
-                sw.WriteLine(pc.strength);
-                sw.WriteLine(pc.agility);
-                sw.WriteLine(pc.wisdom);
-
-                sw.WriteLine(pc.equipment.Count);
-                foreach (int equipID in pc.equipment)
-                {
-                    sw.WriteLine(equipID);
-                }
-            }
-        }
+        string serializedParty = PartySerializer.SerializeParty(GameContent.partyCharacters);
+        TextFileStorage.WriteTextToFile(PartyFilePath, serializedParty);
     }
 
     static public void LoadPartyButtonPressed()
     {
-        GameContent.partyCharacters.Clear();
-        /*
-        PartyCharacter pc = new PartyCharacter(1, 10, 10, 10, 10, 10);
-        GameContent.partyCharacters.AddLast(pc);
-        pc = new PartyCharacter(2, 11, 11, 11, 11, 11);
-        GameContent.partyCharacters.AddLast(pc);
-        pc = new PartyCharacter(3, 12, 12, 12, 12, 12);
-        GameContent.partyCharacters.AddLast(pc);
-        */
-        using (StreamReader sr = new StreamReader("party.txt"))
-        {
-            while (sr.Peek() != -1)
-            {
-                PartyCharacter pc = new PartyCharacter();
+        if (!File.Exists(PartyFilePath))
+            return;
 
-                pc.classID = int.Parse(sr.ReadLine());
-                pc.health = int.Parse(sr.ReadLine());
-                pc.mana = int.Parse(sr.ReadLine());
-                pc.strength = int.Parse(sr.ReadLine());
-                pc.agility = int.Parse(sr.ReadLine());
-                pc.wisdom = int.Parse(sr.ReadLine());
-
-                int equipmentCount = int.Parse(sr.ReadLine());
-                for (int i = 0; i < equipmentCount; i++)
-                {
-                    pc.equipment.AddLast(int.Parse(sr.ReadLine()));
-                }
-
-                GameContent.partyCharacters.AddLast(pc);
-            }
-        }
+        string serializedParty = TextFileStorage.ReadTextFromFile(PartyFilePath);
+        GameContent.partyCharacters = PartySerializer.DeserializeParty(serializedParty);
 
         GameContent.RefreshUI();
     }
@@ -156,14 +221,14 @@ static public class AssignmentConfiguration
 
 /*
 
-In this part of the assignment you are challenged to expand on the functionality that you have already created.  
+In this part of the assignment you are challenged to expand on the functionality that you have already created.
     You are being challenged to save, load and manage multiple parties.
     You are being challenged to identify each party via a string name (a member of the Party class).
 
-To aid you in this challenge, the UI has been altered.  
+To aid you in this challenge, the UI has been altered.
 
-    The load button has been replaced with a drop down list.  
-    When this load party drop down list is changed, LoadPartyDropDownChanged(string selectedName) will be called.  
+    The load button has been replaced with a drop down list.
+    When this load party drop down list is changed, LoadPartyDropDownChanged(string selectedName) will be called.
     When this drop down is created, it will be populated with the return value of GetListOfPartyNames().
 
     GameStart() is called when the program starts.
@@ -179,7 +244,7 @@ Again, you are being challenged to develop the ability to save and load multiple
     Let me ask you,
         What do you need to program to produce the saving, loading and management of multiple parties?
         What are the variables that you will need to declare?
-        What are the things that you will need to do?  
+        What are the things that you will need to do?
     So much of development is just breaking problems down into smaller parts.
     Take the time to name each part of what you will create and then, do it.
 
@@ -189,116 +254,102 @@ Good luck, journey well.
 
 static public class AssignmentPart2
 {
+    const string SavedPartiesFolder = "SavedParties/";
+    const string SavedPartyFileExtension = ".txt";
 
-    static List<string> listOfPartyNames;
-    static string currentPartyName;
-    const string SaveFolder = "SavedParties/";
+    static List<string> savedPartyNames;
+    static string selectedPartyName;
 
     static public void GameStart()
     {
-        listOfPartyNames = new List<string>();
+        savedPartyNames = new List<string>();
 
-        if (!Directory.Exists(SaveFolder))
-            Directory.CreateDirectory(SaveFolder);
+        if (!Directory.Exists(SavedPartiesFolder))
+            Directory.CreateDirectory(SavedPartiesFolder);
 
-        RefreshPartyNameList();
+        RefreshSavedPartyNames();
         GameContent.RefreshUI();
     }
-    static void RefreshPartyNameList()
-    {
-        listOfPartyNames.Clear();
-        foreach (string filePath in Directory.GetFiles(SaveFolder, "*.txt"))
-        {
-            listOfPartyNames.Add(Path.GetFileNameWithoutExtension(filePath));
-        }
-    }
+
     static public List<string> GetListOfPartyNames()
     {
-        return listOfPartyNames;
+        return savedPartyNames;
     }
 
     static public void LoadPartyDropDownChanged(string selectedName)
     {
         LoadParty(selectedName);
-        currentPartyName = selectedName;
+        selectedPartyName = selectedName;
+
         GameContent.RefreshUI();
     }
 
     static public void SavePartyButtonPressed()
     {
-        string name = GameContent.GetPartyNameFromInput();
-        SaveParty(name);
-        currentPartyName = name;
+        string partyName = GameContent.GetPartyNameFromInput();
+        if (string.IsNullOrWhiteSpace(partyName))
+            return;
 
-        RefreshPartyNameList();
+        SaveParty(partyName);
+        selectedPartyName = partyName;
+
+        RefreshSavedPartyNames();
         GameContent.RefreshUI();
     }
 
     static public void DeletePartyButtonPressed()
     {
-        if (currentPartyName != null)
+        if (selectedPartyName != null)
         {
-            string path = SaveFolder + currentPartyName + ".txt";
-            if (File.Exists(path))
-                File.Delete(path);
+            DeleteParty(selectedPartyName);
+            selectedPartyName = null;
 
-            currentPartyName = null;
             GameContent.partyCharacters.Clear();
-            RefreshPartyNameList();
+            RefreshSavedPartyNames();
         }
 
         GameContent.RefreshUI();
     }
-    static void SaveParty(string name)
-    {
-        using (StreamWriter sw = new StreamWriter(SaveFolder + name + ".txt"))
-        {
-            foreach (PartyCharacter pc in GameContent.partyCharacters)
-            {
-                sw.WriteLine(pc.classID);
-                sw.WriteLine(pc.health);
-                sw.WriteLine(pc.mana);
-                sw.WriteLine(pc.strength);
-                sw.WriteLine(pc.agility);
-                sw.WriteLine(pc.wisdom);
 
-                sw.WriteLine(pc.equipment.Count);
-                foreach (int equipID in pc.equipment)
-                    sw.WriteLine(equipID);
-            }
-        }
+    static void SaveParty(string partyName)
+    {
+        string serializedParty = PartySerializer.SerializeParty(GameContent.partyCharacters);
+        TextFileStorage.WriteTextToFile(GetPartyFilePath(partyName), serializedParty);
     }
-    static void LoadParty(string name)
+
+    static void LoadParty(string partyName)
     {
-        GameContent.partyCharacters.Clear();
-
-        string path = SaveFolder + name + ".txt";
-        if (!File.Exists(path)) return;
-
-        using (StreamReader sr = new StreamReader(path))
+        string partyFilePath = GetPartyFilePath(partyName);
+        if (!File.Exists(partyFilePath))
         {
-            while (sr.Peek() != -1)
-            {
-                PartyCharacter pc = new PartyCharacter();
-
-                pc.classID = int.Parse(sr.ReadLine());
-                pc.health = int.Parse(sr.ReadLine());
-                pc.mana = int.Parse(sr.ReadLine());
-                pc.strength = int.Parse(sr.ReadLine());
-                pc.agility = int.Parse(sr.ReadLine());
-                pc.wisdom = int.Parse(sr.ReadLine());
-
-                int equipmentCount = int.Parse(sr.ReadLine());
-                for (int i = 0; i < equipmentCount; i++)
-                    pc.equipment.AddLast(int.Parse(sr.ReadLine()));
-
-                GameContent.partyCharacters.AddLast(pc);
-            }
+            GameContent.partyCharacters.Clear();
+            return;
         }
+
+        string serializedParty = TextFileStorage.ReadTextFromFile(partyFilePath);
+        GameContent.partyCharacters = PartySerializer.DeserializeParty(serializedParty);
+    }
+
+    static void DeleteParty(string partyName)
+    {
+        string partyFilePath = GetPartyFilePath(partyName);
+        if (File.Exists(partyFilePath))
+            File.Delete(partyFilePath);
+    }
+
+    static void RefreshSavedPartyNames()
+    {
+        savedPartyNames.Clear();
+
+        foreach (string partyFilePath in Directory.GetFiles(SavedPartiesFolder, "*" + SavedPartyFileExtension))
+            savedPartyNames.Add(Path.GetFileNameWithoutExtension(partyFilePath));
+    }
+
+    static string GetPartyFilePath(string partyName)
+    {
+        return SavedPartiesFolder + partyName + SavedPartyFileExtension;
     }
 
 }
 
 #endregion
-
-
